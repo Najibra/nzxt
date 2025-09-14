@@ -1,89 +1,37 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta
-  name="viewport"
-  content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Kraken HUD — MGS</title>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Kraken HUD Sensors</title>
 <style>
-  :root {
-    --bg:#0a0f0a;               /* deep green-black */
-    --hud:#63ff87;              /* MGS terminal green */
-    --hud-dim:#2fbf66;
-    --accent:#9bffc1;
-  }
-
-  /* 640x640, circular mask for Kraken */
-  html, body {
-    margin:0; padding:0; background:transparent; height:100%;
-  }
+  body, html { margin:0; padding:0; background:transparent; height:100%; }
   .viewport {
-    position:fixed; inset:0; margin:auto;
-    width:640px; height:640px;
-    border-radius:50%;
-    overflow:hidden;
-    background: radial-gradient(120% 120% at 50% 50%, #0e190e 0%, var(--bg) 60%, #000 100%);
+    width:640px; height:640px; margin:auto;
+    border-radius:50%; overflow:hidden; position:relative;
+    background: radial-gradient(120% 120% at 50% 50%, #0e190e 0%, #0a0f0a 60%, #000 100%);
     box-shadow: inset 0 0 60px rgba(0,0,0,.7);
   }
+  canvas { width:100%; height:100%; display:block; }
 
-  /* subtle scanlines */
-  .scanlines::after {
-    content:"";
-    position:absolute; inset:0;
-    background-image: repeating-linear-gradient(
-      to bottom,
-      rgba(99,255,135,0.06) 0px,
-      rgba(99,255,135,0.06) 1px,
-      transparent 2px,
-      transparent 3px
-    );
-    mix-blend-mode: screen;
-    pointer-events:none;
-  }
-
-  canvas { display:block; width:100%; height:100%; }
-
-  /* numeric HUD chips */
-  .chips {
-    position:absolute; inset:0; pointer-events:none; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-    color:var(--hud); text-shadow: 0 0 8px rgba(99,255,135,.45);
-  }
   .chip {
-    position:absolute; display:flex; gap:8px; align-items:baseline;
+    position:absolute;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    color:#63ff87;
+    font-size:28px;
+    text-shadow:0 0 8px rgba(99,255,135,0.6);
     background: rgba(20,40,28,.18);
     border: 1px solid rgba(99,255,135,.25);
-    border-radius:12px; padding:8px 10px;
+    border-radius:12px; padding:6px 10px;
     backdrop-filter: blur(2px);
   }
-  .val { font-size:38px; line-height:1; letter-spacing:0.5px; }
-  .unit { font-size:14px; opacity:.75; transform: translateY(1px); }
+  #cpuTemp { top:26px; left:26px; }
+  #gpuTemp { top:26px; right:26px; text-align:right; }
+  #pumpRpm { bottom:26px; left:26px; }
+  #gpuFan  { bottom:26px; right:26px; text-align:right; }
+  #mbTemp  { bottom:96px; left:50%; transform:translateX(-50%); }
 
-  /* progress bars */
-  .bar {
-    position:absolute; left:0; bottom:-6px; height:3px; width:100%;
-    background: linear-gradient(90deg, var(--hud) var(--pct, 50%), rgba(99,255,135,.1) 0);
-    border-radius:6px;
-  }
-
-  /* tiny animated radar sweep overlay */
-  .sweep {
-    position:absolute; inset:-10%; border-radius:50%; pointer-events:none;
-    background:
-      conic-gradient(from var(--angle, 0deg),
-        rgba(99,255,135,.00) 0deg,
-        rgba(99,255,135,.00) 320deg,
-        rgba(99,255,135,.28) 350deg,
-        rgba(99,255,135,.00) 360deg);
-    mix-blend-mode: screen;
-    filter: blur(2px) brightness(1.2);
-    animation: sweep 6s linear infinite;
-  }
-  @keyframes sweep {
-    to { --angle: 360deg; }
-  }
-
-  /* concentric ring marks */
+  /* dashed ring accents */
   .rings::before, .rings::after {
     content:""; position:absolute; inset:8%; border-radius:50%;
     border:1px dashed rgba(99,255,135,.18);
@@ -96,254 +44,111 @@
 </style>
 </head>
 <body>
-  <div class="viewport scanlines rings">
+  <div class="viewport rings">
     <canvas id="hud" width="640" height="640" aria-hidden="true"></canvas>
-    <div class="sweep"></div>
-
-    <!-- Numeric chips (NO labels, just numbers/units) -->
-    <div class="chips" id="chips">
-      <!-- CPU Temp -->
-      <div class="chip" id="cpuTemp" style="top:24px; left:24px; min-width:120px;">
-        <span class="val" data-key="cpuTemp">--</span><span class="unit">°C</span>
-        <div class="bar"></div>
-      </div>
-
-      <!-- GPU Temp -->
-      <div class="chip" id="gpuTemp" style="top:24px; right:24px; min-width:120px; justify-content:flex-end;">
-        <span class="val" data-key="gpuTemp">--</span><span class="unit">°C</span>
-        <div class="bar"></div>
-      </div>
-
-      <!-- CPU Fan / Pump RPM -->
-      <div class="chip" id="pumpRpm" style="bottom:24px; left:24px; min-width:130px;">
-        <span class="val" data-key="pumpRpm">--</span><span class="unit">RPM</span>
-        <div class="bar"></div>
-      </div>
-
-      <!-- GPU Fan RPM -->
-      <div class="chip" id="gpuFan" style="bottom:24px; right:24px; min-width:130px; justify-content:flex-end;">
-        <span class="val" data-key="gpuFan">--</span><span class="unit">RPM</span>
-        <div class="bar"></div>
-      </div>
-
-      <!-- Motherboard VRM / Chipset Temp (center bottom) -->
-      <div class="chip" id="mbTemp" style="left:50%; transform:translateX(-50%); bottom:86px; min-width:120px;">
-        <span class="val" data-key="mbTemp">--</span><span class="unit">°C</span>
-        <div class="bar"></div>
-      </div>
-    </div>
+    <!-- Sensor chips (always on top) -->
+    <div id="cpuTemp" class="chip">CPU: -- °C</div>
+    <div id="gpuTemp" class="chip">GPU: -- °C</div>
+    <div id="pumpRpm" class="chip">Pump: -- RPM</div>
+    <div id="gpuFan" class="chip">GPU Fan: -- RPM</div>
+    <div id="mbTemp" class="chip">MB: -- °C</div>
   </div>
 
 <script>
-/* ====== CONFIG ====== */
-/* You can tweak preferred sensor keys below if CAM exposes different names on your rig */
-const PREFERRED_KEYS = {
-  cpuTemp: ["cpu_temperature", "cpu_temp", "package_temp", "t_ctl", "cpu_die_temp"],
-  gpuTemp: ["gpu_temperature", "gpu_temp", "gpu_hotspot"],
-  pumpRpm: ["pump_rpm", "liquid_pump", "cpu_fan_rpm", "aio_pump"],
-  gpuFan:  ["gpu_fan_rpm", "gpu_fan_speed"],
-  mbTemp:  ["motherboard_temp", "vrm_temp", "pch_temp", "chipset_temp", "system_temp"]
-};
-/* Bar scaling */
-const LIMITS = {
-  cpuTemp: {min:20, max:95},
-  gpuTemp: {min:20, max:95},
-  pumpRpm: {min:400, max:3200},
-  gpuFan:  {min:0, max:4500},
-  mbTemp:  {min:20, max:95}
-};
-/* ====== END CONFIG ====== */
+const canvas = document.getElementById("hud");
+const ctx = canvas.getContext("2d");
 
-const state = {
-  cpuTemp: null, gpuTemp: null, pumpRpm: null, gpuFan: null, mbTemp: null,
-  cpuClock: null, gpuClock: null, time: 0
-};
+/* simple HUD render loop (60fps-ish) */
+function draw(){
+  const w = canvas.width, h = canvas.height, cx = w/2, cy = h/2;
+  ctx.clearRect(0,0,w,h);
 
-function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
-function lerp(a,b,t){ return a + (b-a)*t; }
-
-/* Try to pick the first available value from preferred keys list */
-function pickSensor(sensors, keys){
-  for(const k of keys){
-    if (k in sensors && sensors[k] != null) return sensors[k];
-    // Also try case-insensitive and nested paths CAM may use
-    const alt = Object.keys(sensors).find(name => name.toLowerCase() === k.toLowerCase());
-    if (alt) return sensors[alt];
+  // green grid rings
+  ctx.save();
+  ctx.strokeStyle="rgba(99,255,135,0.28)";
+  ctx.lineWidth=2;
+  for(let r=80;r<=300;r+=40){
+    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2); ctx.stroke();
   }
-  return null;
+
+  // rotating dashed ring
+  const spin = (performance.now()/1000) * 0.6;
+  ctx.translate(cx,cy);
+  ctx.rotate(spin);
+  ctx.setLineDash([8,16]);
+  ctx.strokeStyle="rgba(99,255,135,0.45)";
+  ctx.beginPath(); ctx.arc(0,0, 290, 0, Math.PI*2); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // reticle
+  ctx.strokeStyle="rgba(99,255,135,0.5)";
+  ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(-64,0); ctx.lineTo(64,0); ctx.moveTo(0,-64); ctx.lineTo(0,64); ctx.stroke();
+  ctx.restore();
+
+  requestAnimationFrame(draw);
 }
+requestAnimationFrame(draw);
 
-/* Update from NZXT CAM */
-window.onMonitoringDataUpdate = function(payload){
-  /* CAM typically sends a flat map or nested categories; normalize */
-  const sensors = flattenSensors(payload);
-
-  state.cpuTemp = pickSensor(sensors, PREFERRED_KEYS.cpuTemp);
-  state.gpuTemp = pickSensor(sensors, PREFERRED_KEYS.gpuTemp);
-  state.pumpRpm = pickSensor(sensors, PREFERRED_KEYS.pumpRpm);
-  state.gpuFan  = pickSensor(sensors, PREFERRED_KEYS.gpuFan);
-  state.mbTemp  = pickSensor(sensors, PREFERRED_KEYS.mbTemp);
-
-  // Optional clocks if present (used for subtle arcs)
-  state.cpuClock = sensors["cpu_clock"] ?? sensors["cpu_core_clock"] ?? null;
-  state.gpuClock = sensors["gpu_clock"] ?? sensors["gpu_core_clock"] ?? null;
+/* === SENSOR HANDLING === */
+const PREFERRED_KEYS = {
+  cpuTemp: ["cpu_temperature","cpu_temp","package_temp","t_ctl","cpu_die_temp"],
+  gpuTemp: ["gpu_temperature","gpu_temp","gpu_hotspot"],
+  pumpRpm: ["pump_rpm","liquid_pump","cpu_fan_rpm","aio_pump"],
+  gpuFan:  ["gpu_fan_rpm","gpu_fan_speed","gpu_fan"],
+  mbTemp:  ["motherboard_temp","vrm_temp","temp_mos","pch_temp","chipset_temp","system_temp"]
 };
 
-/* Flatten nested objects one level deep: {cpu:{temp:..}} -> {cpu_temp:..} */
-function flattenSensors(obj, prefix=""){
-  const out = {};
-  for(const [k,v] of Object.entries(obj || {})){
-    const key = prefix ? `${prefix}_${k}` : k;
-    if (v && typeof v === "object" && !Array.isArray(v)) {
-      Object.assign(out, flattenSensors(v, key));
-    } else {
-      out[key] = v;
-    }
+function flatten(obj,prefix=""){
+  const out={};
+  for(const [k,v] of Object.entries(obj||{})){
+    const key=prefix?`${prefix}_${k}`:k;
+    if(v && typeof v==="object" && !Array.isArray(v)) Object.assign(out,flatten(v,key));
+    else out[key]=v;
   }
   return out;
 }
 
-/* Paint at ~60fps */
-const canvas = document.getElementById("hud");
-const ctx = canvas.getContext("2d");
-let last = performance.now();
-
-function pct(val, lim){
-  if (val == null) return 0.0;
-  return clamp((val - lim.min) / (lim.max - lim.min), 0, 1);
-}
-
-/* Draw Metal Gear–style HUD (no text, just geometry around the numbers) */
-function draw(dt){
-  const w = canvas.width, h = canvas.height;
-  ctx.clearRect(0,0,w,h);
-
-  // center
-  const cx = w/2, cy = h/2;
-  const rOuter = 300, rInner = 110;
-
-  // background grid glow
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.strokeStyle = "rgba(99,255,135,0.18)";
-  ctx.lineWidth = 1;
-
-  // concentric arcs
-  for (let r = rInner; r <= rOuter; r += 28){
-    ctx.beginPath();
-    ctx.arc(0,0,r,0,Math.PI*2);
-    ctx.stroke();
+function pick(sensors, keys){
+  for(const k of keys){
+    if(k in sensors && sensors[k]!=null) return sensors[k];
+    const alt = Object.keys(sensors).find(n=>n.toLowerCase()===k.toLowerCase());
+    if(alt) return sensors[alt];
   }
-
-  // rotating tick ring (subtle)
-  const spin = (performance.now()/1000) * 0.6;
-  ctx.rotate(spin);
-  ctx.strokeStyle = "rgba(99,255,135,0.35)";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([8, 16]);
-  ctx.beginPath();
-  ctx.arc(0,0, rOuter-14, 0, Math.PI*2);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.restore();
-
-  // CPU/GPU arc gauges (values only; arcs as context)
-  const cpuP = pct(state.cpuTemp, LIMITS.cpuTemp);
-  const gpuP = pct(state.gpuTemp, LIMITS.gpuTemp);
-  const cpuAngle = lerp(0.25*Math.PI, 1.75*Math.PI, cpuP);
-  const gpuAngle = lerp(0.25*Math.PI, 1.75*Math.PI, gpuP);
-
-  drawArcGauge(cx, cy, 210, 18, 0.25*Math.PI, cpuAngle, "rgba(99,255,135,0.95)");
-  drawArcGauge(cx, cy, 170, 18, 0.25*Math.PI, gpuAngle, "rgba(47,191,102,0.9)");
-
-  // micro “clock” arcs if present
-  if (state.cpuClock) {
-    const p = clamp(state.cpuClock / 6000, 0, 1); // normalize up to 6 GHz
-    drawArcGauge(cx, cy, 240, 4, -Math.PI*0.5, -Math.PI*0.5 + p*2*Math.PI, "rgba(155,255,193,0.6)");
-  }
-  if (state.gpuClock) {
-    const p = clamp(state.gpuClock / 3300, 0, 1); // normalize up to 3.3 GHz
-    drawArcGauge(cx, cy, 150, 4, -Math.PI*0.5, -Math.PI*0.5 + p*2*Math.PI, "rgba(155,255,193,0.6)");
-  }
-
-  // center reticle
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.strokeStyle = "rgba(99,255,135,0.5)";
-  ctx.lineWidth = 1.5;
-  crosshair(ctx, 64);
-  ctx.restore();
-
-  // update numeric chips
-  updateChip("cpuTemp", state.cpuTemp, LIMITS.cpuTemp);
-  updateChip("gpuTemp", state.gpuTemp, LIMITS.gpuTemp);
-  updateChip("pumpRpm", state.pumpRpm, LIMITS.pumpRpm);
-  updateChip("gpuFan",  state.gpuFan,  LIMITS.gpuFan);
-  updateChip("mbTemp",  state.mbTemp,  LIMITS.mbTemp);
+  return null;
 }
 
-/* helpers */
-function drawArcGauge(cx, cy, radius, thickness, a0, a1, color){
-  const ctx2 = ctx;
-  ctx2.save();
-  ctx2.beginPath();
-  ctx2.strokeStyle = "rgba(99,255,135,0.15)";
-  ctx2.lineWidth = thickness;
-  ctx2.arc(cx, cy, radius, 0.25*Math.PI, 1.75*Math.PI);
-  ctx2.stroke();
-
-  ctx2.beginPath();
-  ctx2.strokeStyle = color;
-  ctx2.shadowColor = color;
-  ctx2.shadowBlur = 8;
-  ctx2.lineWidth = thickness;
-  ctx2.lineCap = "round";
-  ctx2.arc(cx, cy, radius, a0, a1);
-  ctx2.stroke();
-  ctx2.restore();
+function setText(id, label, value, unit){
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(value==null || isNaN(value)) { el.textContent = label + ": -- " + unit; return; }
+  el.textContent = label + ": " + Math.round(value) + " " + unit;
 }
 
-function crosshair(ctx, size){
-  ctx.beginPath();
-  ctx.moveTo(-size, 0); ctx.lineTo(size, 0);
-  ctx.moveTo(0, -size); ctx.lineTo(0, size);
-  ctx.stroke();
-}
+/* Main CAM callback */
+window.onMonitoringDataUpdate = function(payload){
+  const s = flatten(payload);
+  setText("cpuTemp","CPU", pick(s,PREFERRED_KEYS.cpuTemp), "°C");
+  setText("gpuTemp","GPU", pick(s,PREFERRED_KEYS.gpuTemp), "°C");
+  setText("pumpRpm","Pump", pick(s,PREFERRED_KEYS.pumpRpm), "RPM");
+  setText("gpuFan","GPU Fan", pick(s,PREFERRED_KEYS.gpuFan), "RPM");
+  setText("mbTemp","MB", pick(s,PREFERRED_KEYS.mbTemp), "°C");
+};
 
-function updateChip(id, value, lim){
-  const el = document.querySelector(`#${id} .val`);
-  const bar = document.querySelector(`#${id} .bar`);
-  if (!el) return;
-  if (value == null || isNaN(value)) {
-    el.textContent = "--";
-    if (bar) bar.style.setProperty("--pct", "0%");
-    return;
-  }
-  const v = Math.round(value);
-  el.textContent = v.toString();
-  if (bar) {
-    const p = Math.round(pct(value, lim)*100);
-    bar.style.setProperty("--pct", p + "%");
-  }
-}
-
-/* Animation loop ~60fps */
-function tick(ts){
-  const dt = (ts - last) / 1000;
-  last = ts;
-  state.time += dt;
-  draw(dt);
-  requestAnimationFrame(tick);
-}
-requestAnimationFrame(tick);
-
-/* Desktop safety: show a subtle overlay hint if opened in a normal browser (not required, no text on HUD) */
-(function(){
+/* Optional desktop preview without CAM: fake data so you can see layout in browser */
+(function demoIfDesktop(){
   const isKraken = /[?&]kraken=1/.test(location.search);
-  if (!isKraken) {
-    // No visible text per your ask — we’ll just keep the HUD clean.
-    // If you ever want a link to open in CAM from desktop, you can add it here.
-  }
+  if(isKraken) return;
+  let t=0;
+  setInterval(()=>{
+    t+=0.05;
+    window.onMonitoringDataUpdate({
+      cpu:{temperature: 40+20*Math.abs(Math.sin(t))},
+      gpu:{temperature: 45+25*Math.abs(Math.cos(t)), fan_rpm: 900+800*Math.abs(Math.sin(t*0.4))},
+      pump_rpm: 1100+200*Math.abs(Math.cos(t*0.7)),
+      motherboard:{vrm_temp: 50+10*Math.abs(Math.sin(t*0.3))}
+    });
+  }, 250);
 })();
 </script>
 </body>
