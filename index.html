@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Metal Gear CPU/GPU Monitor</title>
+    <!--
+      This web integration is designed for NZXT Kraken devices. It uses the
+      onMonitoringDataUpdate callback provided by CAM to receive CPU and GPU
+      telemetry and displays the current temperature in a Metal Gear–inspired
+      interface. The styling lives in styles.css and the logic is in script.js.
+      When running inside CAM, the script listens for updates on monitoring
+      data every second and updates the UI accordingly. Outside of CAM, a
+      fallback interval simulates changing temperatures for demonstration.
+    -->
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="container">
+      <h1>Metal Gear Monitor</h1>
+      <div class="temperature-display">
+        <div class="metric">
+          <span class="label">CPU Temp</span>
+          <span class="value" id="cpu-temp">-- °C</span>
+        </div>
+        <div class="metric">
+          <span class="label">GPU Temp</span>
+          <span class="value" id="gpu-temp">-- °C</span>
+        </div>
+      </div>
+      <footer>
+        <p>
+          Designed with inspiration from the Metal Gear Solid
+          communications interface. The smooth animations and minimalist
+          typography aim to evoke the game's stealthy aesthetic while still
+          clearly presenting live hardware temperatures.
+        </p>
+      </footer>
+    </div>
+    <script src="script.js"></script>
+  </body>
+</html>
