@@ -31,8 +31,22 @@ interface CenterDialProps {
   ramHistory: number[];
 }
 
+interface FocusReading {
+  label: string;
+  primary: string;
+  primaryLabel: string;
+  secondary: string;
+  secondaryLabel: string;
+  accent: "cpu" | "gpu" | "ram" | "ssd" | "system";
+  progress: number;
+}
+
 const DISPLAY_SIZE = 640;
 const CLOCK_UPDATE_MS = 10000;
+const MAIN_SCREEN_MS = 15000;
+const FOCUS_SCREEN_MS = 5000;
+const FOCUS_SEQUENCE = ["cpu", "gpu", "ram", "liquid", "fans", "power"] as const;
+type FocusKey = (typeof FOCUS_SEQUENCE)[number];
 
 function displayTemp(celsius: number, unit: FlightdeckSettings["unit"]) {
   return unit === "f" ? fahrenheitFromCelsius(celsius) : celsius;
@@ -225,14 +239,56 @@ function BottomPanel({
   );
 }
 
+function FocusScreen({ reading }: { reading: FocusReading }) {
+  return (
+    <section className={`focus-screen focus-screen-${reading.accent}`} aria-label={`${reading.label} focus reading`}>
+      <div className="focus-ring" style={{ "--focus-progress": `${clamp(reading.progress, 0, 100)}` } as React.CSSProperties} />
+      <div className="focus-copy">
+        <div className="focus-label">{reading.label}</div>
+        <div className="focus-primary">{reading.primary}</div>
+        <div className="focus-primary-label">{reading.primaryLabel}</div>
+        <div className="focus-divider" />
+        <div className="focus-secondary">{reading.secondary}</div>
+        <div className="focus-secondary-label">{reading.secondaryLabel}</div>
+      </div>
+    </section>
+  );
+}
+
 export function FlightdeckDisplay({ settings, telemetry, compact = false }: FlightdeckDisplayProps) {
   const { snapshot, cpuHistory, gpuHistory, ramHistory } = telemetry;
   const [clock, setClock] = useState(() => formatClock(Date.now()));
+  const [screenPhase, setScreenPhase] = useState<{ mode: "main" | "focus"; focusIndex: number }>({
+    mode: "main",
+    focusIndex: 0
+  });
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(formatClock(Date.now())), CLOCK_UPDATE_MS);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (settings.motion === "off") {
+      setScreenPhase({ mode: "main", focusIndex: 0 });
+      return undefined;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setScreenPhase((current) => {
+        if (current.mode === "main") {
+          return { ...current, mode: "focus" };
+        }
+
+        return {
+          mode: "main",
+          focusIndex: (current.focusIndex + 1) % FOCUS_SEQUENCE.length
+        };
+      });
+    }, screenPhase.mode === "main" ? MAIN_SCREEN_MS : FOCUS_SCREEN_MS);
+
+    return () => window.clearTimeout(timeout);
+  }, [screenPhase, settings.motion]);
 
   const unit = tempUnit(settings.unit);
   const cpuTemp = displayTemp(snapshot.cpu.temperature, settings.unit);
@@ -240,6 +296,67 @@ export function FlightdeckDisplay({ settings, telemetry, compact = false }: Flig
   const ramUsed = formatGb(snapshot.ram.inUseMb);
   const ramTotal = Math.round(snapshot.ram.totalMb / 1024).toString();
   const liquidTemp = displayTemp(snapshot.liquid.temperature, settings.unit);
+  const fanSpeed = snapshot.cooling.cpuFanSpeed || snapshot.cooling.pumpSpeed;
+  const pumpSpeed = snapshot.cooling.pumpSpeed || snapshot.cooling.cpuFanSpeed;
+  const powerWatts = snapshot.power.combinedWatts || snapshot.cpu.power || snapshot.gpu.power;
+  const activeFocus = FOCUS_SEQUENCE[screenPhase.focusIndex];
+  const focusReadings: Record<FocusKey, FocusReading> = {
+    cpu: {
+      label: "CPU",
+      primary: `${cpuTemp}${degreeText(unit)}`,
+      primaryLabel: "TEMP",
+      secondary: `${snapshot.cpu.load}%`,
+      secondaryLabel: "LOAD",
+      accent: "cpu",
+      progress: snapshot.cpu.load
+    },
+    gpu: {
+      label: "GPU",
+      primary: `${gpuTemp}${degreeText(unit)}`,
+      primaryLabel: "TEMP",
+      secondary: `${snapshot.gpu.load}%`,
+      secondaryLabel: "LOAD",
+      accent: "gpu",
+      progress: snapshot.gpu.load
+    },
+    ram: {
+      label: "RAM",
+      primary: `${snapshot.ram.inUsePercent}%`,
+      primaryLabel: "USED",
+      secondary: `${ramUsed} / ${ramTotal} GB`,
+      secondaryLabel: "MEMORY",
+      accent: "ram",
+      progress: snapshot.ram.inUsePercent
+    },
+    liquid: {
+      label: "LIQUID",
+      primary: `${liquidTemp}${degreeText(unit)}`,
+      primaryLabel: "TEMP",
+      secondary: `${pumpSpeed} RPM`,
+      secondaryLabel: "PUMP",
+      accent: "system",
+      progress: clamp(liquidTemp * 2, 0, 100)
+    },
+    fans: {
+      label: "FANS",
+      primary: `${fanSpeed}`,
+      primaryLabel: "RPM",
+      secondary: `${pumpSpeed} RPM`,
+      secondaryLabel: "PUMP",
+      accent: "system",
+      progress: clamp(fanSpeed / 20, 0, 100)
+    },
+    power: {
+      label: "POWER",
+      primary: `${powerWatts} W`,
+      primaryLabel: "DRAW",
+      secondary: `CPU ${snapshot.cpu.power}W  GPU ${snapshot.gpu.power}W`,
+      secondaryLabel: "SPLIT",
+      accent: "ssd",
+      progress: clamp(powerWatts / 3, 0, 100)
+    }
+  };
+  const isFocusVisible = screenPhase.mode === "focus" && settings.motion !== "off";
 
   return (
     <section
@@ -248,7 +365,10 @@ export function FlightdeckDisplay({ settings, telemetry, compact = false }: Flig
       data-motion={settings.motion}
       aria-label="NZXT Kraken circular display"
     >
-      <div className="kraken-display" style={{ width: DISPLAY_SIZE, height: DISPLAY_SIZE }}>
+      <div
+        className={`kraken-display ${isFocusVisible ? "kraken-display-focus" : ""}`}
+        style={{ width: DISPLAY_SIZE, height: DISPLAY_SIZE }}
+      >
         <div className="display-bezel display-bezel-outer" />
         <div className="display-bezel display-bezel-mid" />
         <div className="display-bezel display-bezel-inner" />
@@ -317,9 +437,11 @@ export function FlightdeckDisplay({ settings, telemetry, compact = false }: Flig
         />
 
         <BottomPanel
-          fans={`${snapshot.cooling.cpuFanSpeed || snapshot.cooling.pumpSpeed} RPM`}
-          power={`${snapshot.power.combinedWatts || snapshot.cpu.power || snapshot.gpu.power} W`}
+          fans={`${fanSpeed} RPM`}
+          power={`${powerWatts} W`}
         />
+
+        {isFocusVisible ? <FocusScreen reading={focusReadings[activeFocus]} /> : null}
       </div>
     </section>
   );
