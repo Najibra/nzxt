@@ -195,9 +195,9 @@ a {
 
 .system-pod {
   left: 236px;
-  top: 44px;
+  top: 34px;
   width: 168px;
-  height: 140px;
+  height: 168px;
 }
 
 .pod-ring {
@@ -476,9 +476,9 @@ a {
 .system-pod-copy {
   position: absolute;
   left: 15px;
-  top: 0;
+  top: 18px;
   width: 138px;
-  height: 140px;
+  height: 132px;
   text-align: center;
 }
 
