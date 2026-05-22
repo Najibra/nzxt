@@ -181,7 +181,7 @@ a {
 
 .pod-ram {
   left: 408px;
-  top: 382px;
+  top: 365px;
   width: 168px;
   height: 168px;
 }
@@ -334,6 +334,16 @@ a {
 }
 
 .pod-ssd .pod-detail-label {
+  display: none;
+}
+
+.pod-ram .pod-copy {
+  top: 34px;
+}
+
+.pod-ram .pod-divider,
+.pod-ram .pod-detail,
+.pod-ram .pod-detail-label {
   display: none;
 }
 

@@ -403,8 +403,8 @@ export function FlightdeckDisplay({ settings, telemetry, compact = false }: Flig
           value={`${snapshot.ram.inUsePercent}`}
           suffix="%"
           mode="USAGE"
-          detail={`${ramUsed} / ${ramTotal} GB`}
-          detailLabel="USED"
+          detail=""
+          detailLabel=""
           progress={snapshot.ram.inUsePercent}
           accent="ram"
         />
