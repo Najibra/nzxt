@@ -166,8 +166,8 @@ a {
 }
 
 .pod-cpu {
-  left: 236px;
-  top: 34px;
+  left: 394px;
+  top: 135px;
   width: 168px;
   height: 168px;
 }
@@ -180,8 +180,8 @@ a {
 }
 
 .pod-ram {
-  left: 394px;
-  top: 135px;
+  left: 408px;
+  top: 382px;
   width: 168px;
   height: 168px;
 }
@@ -194,10 +194,10 @@ a {
 }
 
 .system-pod {
-  left: 408px;
-  top: 382px;
-  width: 154px;
-  height: 94px;
+  left: 236px;
+  top: 44px;
+  width: 168px;
+  height: 140px;
 }
 
 .pod-ring {
@@ -475,10 +475,10 @@ a {
 
 .system-pod-copy {
   position: absolute;
-  left: 8px;
+  left: 15px;
   top: 0;
   width: 138px;
-  height: 94px;
+  height: 140px;
   text-align: center;
 }
 
