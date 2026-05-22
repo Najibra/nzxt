@@ -68,6 +68,11 @@ type PartialCpu = Partial<Cpu>;
 type PartialGpu = Partial<Gpu>;
 type PartialRam = Partial<Ram>;
 type PartialKraken = Partial<Kraken> & { pumpSpeed?: number };
+type MetricAliases = {
+  usage?: number;
+  utilization?: number;
+  loadPercent?: number;
+};
 
 export interface MonitoringInput {
   cpus?: PartialCpu[];
@@ -96,6 +101,12 @@ const percentFromLoad = (load: unknown): number => {
   return clamp(Math.round(percent), 0, 100);
 };
 
+const firstPercentValue = (metric: (PartialCpu | PartialGpu) & MetricAliases): number => {
+  const values = [metric.load, metric.usage, metric.utilization, metric.loadPercent];
+  const usable = values.find((value) => numberOrZero(value) > 0);
+  return percentFromLoad(usable ?? metric.load);
+};
+
 const discreteGpuMatchers = [/nvidia/i, /geforce/i, /rtx/i, /gtx/i, /radeon rx/i, /arc/i];
 const integratedGpuMatchers = [/integrated/i, /graphics/i, /uhd/i, /iris/i, /vega/i];
 
@@ -120,13 +131,21 @@ function pickGpu(gpus: PartialGpu[] = []): PartialGpu {
 }
 
 function normalizeSystemMetric(metric: PartialCpu | PartialGpu, fallbackName: string): SystemMetric {
+  const power = round(metric.power);
+  const temperature = round(metric.temperature);
+  const load = firstPercentValue(metric as (PartialCpu | PartialGpu) & MetricAliases);
+  const derivedGpuActivity =
+    fallbackName === "GPU" && load === 0 && (power > 0 || temperature > 0)
+      ? clamp(Math.round(power / 2.5) || 1, 1, 100)
+      : load;
+
   return {
     name: metric.name ?? fallbackName,
-    load: percentFromLoad(metric.load),
-    temperature: round(metric.temperature),
+    load: derivedGpuActivity,
+    temperature,
     frequency: round(metric.frequency),
     fanSpeed: round(metric.fanSpeed),
-    power: round(metric.power)
+    power
   };
 }
 
